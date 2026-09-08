@@ -1,4 +1,6 @@
-# pycentauri
+# CentauriPilot
+
+A fork of [pycentauri by bjan](https://github.com/bjan/pycentauri).
 
 Local-network toolkit for [Elegoo Centauri Carbon](https://www.elegoo.com/)
 3D printers — the **original Centauri Carbon (CC1)** and the **Centauri
@@ -7,7 +9,7 @@ MCP server for AI agents, REST/SSE HTTP server, built-in web dashboard,
 and an RTSP bridge for your NVR.
 
 No cloud account, no Elegoo servers — everything talks directly to the
-printer on your LAN. `pycentauri` auto-detects which model it's talking
+printer on your LAN. `centauripilot` auto-detects which model it's talking
 to and speaks the right protocol:
 
 | | CC1 | CC2 |
@@ -33,10 +35,10 @@ to and speaks the right protocol:
 ## Install
 
 ```sh
-pip install pycentauri                    # library + CLI
-pip install "pycentauri[mcp]"             # + MCP server
-pip install "pycentauri[server]"          # + HTTP REST/SSE server + web UI
-pip install "pycentauri[mcp,server]"      # all Python surfaces
+pip install centauripilot                    # library + CLI
+pip install "centauripilot[mcp]"             # + MCP server
+pip install "centauripilot[server]"          # + HTTP REST/SSE server + web UI
+pip install "centauripilot[mcp,server]"      # all Python surfaces
 ```
 
 The RTSP bridge additionally requires
@@ -52,17 +54,17 @@ Python 3.10+. Core dependencies: `websockets`, `paho-mqtt`, `httpx`,
 
 **CC2** needs its IP *and* its access code, found on the printer's
 touchscreen under network/connectivity settings. Pass it as
-`--access-code` / `access_code=` / `PYCENTAURI_ACCESS_CODE`. The examples
+`--access-code` / `access_code=` / `CENTAURIPILOT_ACCESS_CODE`. The examples
 below use `Ab3dEf` as a stand-in — substitute your own.
 
 > **Enable "LAN Only" mode on the CC2** (network settings on the
 > touchscreen). The CC2 gates its local API behind it — with LAN Only
 > off the printer works through Elegoo's cloud and leaves the local HTTP
-> endpoint closed, so pycentauri can't reach it and you'll get a
+> endpoint closed, so CentauriPilot can't reach it and you'll get a
 > connection error. This is required on firmware 2.0 and recommended on
 > all CC2 firmware.
 
-Every CLI command accepts `--host` (env: `PYCENTAURI_HOST`). With no host
+Every CLI command accepts `--host` (env: `CENTAURIPILOT_HOST`). With no host
 given, commands try UDP discovery, which only finds CC1s.
 
 ## CLI
@@ -142,11 +144,11 @@ Speed changes only take effect while a print is actively running.
 #### CC2 speed pinning
 
 Historically the CC2 firmware reset the speed mode back to balanced on
-every Canvas filament switch, losing your choice. pycentauri works
+every Canvas filament switch, losing your choice. CentauriPilot works
 around it by **pinning** the mode you set and re-applying it when a
 filament switch completes (CC2 only, requires `--enable-control`):
 
-- The mode you set via pycentauri is *pinned*.
+- The mode you set via CentauriPilot is *pinned*.
 - When a Canvas filament switch finishes, the pinned mode is re-applied
   once (harmless if the firmware didn't reset it).
 - The pin clears when the print ends.
@@ -154,10 +156,10 @@ filament switch completes (CC2 only, requires `--enable-control`):
 A note on firmware: on **02.01.00.00** the printer no longer exposes a
 stable "set speed mode" over the wire — `gcode_move.speed_mode` in the
 real-time stream is the *current move's* speed factor, which varies per
-feature. pycentauri therefore treats the pin as an explicit setting and
+feature. CentauriPilot therefore treats the pin as an explicit setting and
 never infers or enforces it from that noisy value; it only re-applies
 your pinned mode on switch completion. To change speed, set it through
-pycentauri (the dashboard, `centauri speed`, etc.).
+CentauriPilot (the dashboard, `centauri speed`, etc.).
 
 The CC1 has none of this — its speed mode stays where you put it, so
 `set_print_speed` is a plain one-shot there.
@@ -166,7 +168,7 @@ The CC1 has none of this — its speed mode stays where you put it, so
 
 ```python
 import asyncio
-from pycentauri import Printer, CC2Printer, connect_auto
+from centauripilot import Printer, CC2Printer, connect_auto
 
 async def main():
     # Explicit CC1
@@ -287,14 +289,14 @@ hands on your printer:
 
 ```sh
 # Read-only (status, snapshot, attributes, discovery, canvas)
-claude mcp add pycentauri --env PYCENTAURI_HOST=192.168.1.209 \
-    -- python -m pycentauri.mcp
+claude mcp add centauripilot --env CENTAURIPILOT_HOST=192.168.1.209 \
+    -- python -m centauripilot.mcp
 
 # With control tools
-claude mcp add pycentauri-cc2 \
-    --env PYCENTAURI_HOST=192.168.1.189 \
-    --env PYCENTAURI_ACCESS_CODE=Ab3dEf \
-    -- python -m pycentauri.mcp --enable-control
+claude mcp add centauripilot-cc2 \
+    --env CENTAURIPILOT_HOST=192.168.1.189 \
+    --env CENTAURIPILOT_ACCESS_CODE=Ab3dEf \
+    -- python -m centauripilot.mcp --enable-control
 ```
 
 The target host is pinned in the server's environment at spawn time — a
@@ -359,7 +361,7 @@ The full table (including CC1's resin-inherited codes) is in
 On the CC2, mid-print Canvas filament switches are detected by head
 position: the firmware never fully leaves its "printing" state during a
 switch, but the head parks at the purge chute behind the bed (y ≥ 258 mm,
-physically outside the printable area) for the duration. pycentauri
+physically outside the printable area) for the duration. CentauriPilot
 reports code 27 the entire time the head is parked there mid-print.
 
 ## Safety model
@@ -385,7 +387,7 @@ reports code 27 the entire time the head is parked there mid-print.
   invocation; the HTTP/MCP servers hold exactly one long-lived slot.
 - **Paused/errored states don't push Attributes.** Every SDCP command
   needs the printer's `MainboardID`, which normally arrives in an
-  Attributes push — but not while paused or errored. pycentauri
+  Attributes push — but not while paused or errored. CentauriPilot
   pre-seeds it from UDP discovery on every connect. If you call
   `Printer.connect()` on a paused printer without discovery, pass
   `mainboard_id=` yourself.
@@ -398,7 +400,7 @@ reports code 27 the entire time the head is parked there mid-print.
   acknowledged but no status frame is ever pushed while the printer
   sits idle — persisting across reboots (verified 2026-07-05 on
   V0.3.0-o). Starting a print revives pushes at full rate. One-shot
-  `Cmd 0` requests always work, so pycentauri automatically falls back
+  `Cmd 0` requests always work, so CentauriPilot automatically falls back
   to polling when a subscribe goes quiet (~7 s updates at idle,
   full-rate pushes while printing). Clients that rely purely on
   subscribe pushes will hang forever on an idle printer in this state.
@@ -416,10 +418,10 @@ reports code 27 the entire time the head is parked there mid-print.
   choice, not ours.
 - **Rate limiting.** Rapid-fire MQTT requests (3+ back-to-back) trip a
   cooldown of a few seconds during which the broker silently drops
-  responses. pycentauri's polling cadence stays under it; your scripts
+  responses. CentauriPilot's polling cadence stays under it; your scripts
   should too.
 - **The firmware resets the speed mode to balanced on every Canvas
-  filament switch.** pycentauri pins your chosen mode and re-applies it
+  filament switch.** CentauriPilot pins your chosen mode and re-applies it
   automatically, while still honoring a deliberate balanced from the
   touchscreen — see
   [CC2 speed pinning](#cc2-speed-pinning-the-firmware-fights-you-so-pycentauri-fights-back)
@@ -427,7 +429,7 @@ reports code 27 the entire time the head is parked there mid-print.
 - **Registrations expire without an app-level PING.** The printer
   forgets a registered client after several quiet minutes and silently
   stops answering that session's requests — the MQTT connection itself
-  stays up, so there's no error to catch. pycentauri sends the SDK's
+  stays up, so there's no error to catch. CentauriPilot sends the SDK's
   `{"type": "PING"}` keepalive every 30 s to hold the registration; if
   you write your own client, you must too.
 - **File list (method 1044) and video stream (1042) don't respond** on
@@ -437,7 +439,7 @@ reports code 27 the entire time the head is parked there mid-print.
 ## Project layout & docs
 
 ```
-src/pycentauri/
+src/centauripilot/
 ├── client.py      # CC1: async SDCP-over-WebSocket client
 ├── cc2.py         # CC2: async JSON-RPC-over-MQTT client (same API)
 ├── connect.py     # connect_auto() — port-probe model detection
@@ -461,7 +463,7 @@ src/pycentauri/
 ## Development
 
 ```sh
-git clone https://github.com/bjan/pycentauri && cd pycentauri
+git clone https://github.com/bjan/centauripilot && cd centauripilot
 python -m venv .venv && .venv/bin/pip install -e ".[mcp,server,dev]"
 
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
